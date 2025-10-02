@@ -30,13 +30,13 @@ const QueueList: React.FC<QueueListProps> = ({
     } else if (index === nextInLine) {
       return 'bg-blue-200 border-blue-500 text-blue-800 shadow-lg shadow-blue-500/30';
     } else if (item.name) {
-      return 'bg-white border-gray-400 text-gray-800';
+      return 'bg-yellow-100 border-yellow-400 text-yellow-800';
     } else {
       // Check if user can select this position
       const canSelect = isDeveloperMode || (!isLocked && isShopOpen);
       return canSelect 
-        ? 'bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-white hover:border-red-300 cursor-pointer transition-all duration-300'
-        : 'bg-yellow-100 border-yellow-400 text-yellow-600 cursor-not-allowed opacity-60';
+        ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-red-300 cursor-pointer transition-all duration-300'
+        : 'bg-white border-gray-400 text-gray-600 cursor-not-allowed opacity-60';
     }
   };
 
@@ -121,8 +121,12 @@ const QueueList: React.FC<QueueListProps> = ({
             <span className="text-sm text-gray-700">Próximo</span>
           </div>
           <div className="flex items-center">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+            <div className="w-3 h-3 bg-white border border-gray-400 rounded-full mr-2"></div>
             <span className="text-sm text-gray-700">Disponível</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+            <span className="text-sm text-gray-700">Na fila</span>
           </div>
           <div className="flex items-center">
             <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
