@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title id="page-title">Sistema de Agendamento</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Dynamically update page title from config
+      fetch('/config.json')
+        .then(response => response.json())
+        .then(config => {
+          document.getElementById('page-title').textContent = `Sistema de Agendamento - ${config.barbershop.name}`;
+        })
+        .catch(error => {
+          console.error('Error loading config for title:', error);
+        });
+    </script>
+  </body>
+</html>

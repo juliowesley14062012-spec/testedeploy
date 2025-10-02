@@ -1,0 +1,27 @@
+{
+  "barbershop": {
+    "name": "Brayan Barbearia",
+    "phone": "5521982821521"
+  },
+  "sections": {
+    "schedule": {
+      "title": "Agende a sua vez!",
+      "description": "Lembre-se de acompanhar atualizando o site, e antecipe dois cortes antes de chegar a sua vez. Caso chegue a sua vez e você não esteja na barbearia, sua vez será repassada para o próximo, e terá que agendar novamente, indo para o final da fila. Então, atenção! Vagas limitadas"
+    }
+  },
+  "services": [
+    { "name": "Cortes simples", "price": 20 },
+    { "name": "Corte disfarçado", "price": 30 },
+    { "name": "Barba", "price": 10 },
+    { "name": "Pezinho", "price": 10 },
+    { "name": "Pigmentação", "price": 10 },
+    { "name": "Pezinho e barba", "price": 15 },
+    { "name": "Nevou", "price": 50 },
+    { "name": "Reflexo", "price": 50 }
+  ],
+  "footer": {
+    "message": "Esperamos vê-lo em breve!",
+    "subtitle": "Desenvolvido especialmente para você",
+    "copyright": "© 2025 Brayan Barbearia. Todos os direitos reservados."
+  }
+}
