@@ -121,8 +121,8 @@ const QueueList: React.FC<QueueListProps> = ({
             <span className="text-sm text-gray-700">Próximo</span>
           </div>
           <div className="flex items-center">
-            <div className="w-3 h-3 bg-gray-500 rounded-full mr-2"></div>
-            <span className="text-sm text-gray-700">Na fila</span>
+            <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+            <span className="text-sm text-gray-700">Disponível</span>
           </div>
           <div className="flex items-center">
             <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
