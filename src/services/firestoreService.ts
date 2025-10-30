@@ -1,12 +1,14 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  onSnapshot, 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
   Timestamp,
-  DocumentData 
+  DocumentData
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -49,12 +51,15 @@ export interface Appointment {
 // Queue operations
 export const loadQueue = async (): Promise<QueueItem[]> => {
   try {
-    const queueDoc = await getDoc(doc(db, 'barbershop', 'queue'));
-    if (queueDoc.exists()) {
-      const data = queueDoc.data();
-      return data.items || [];
-    }
-    return [];
+    const queueCollection = collection(db, 'barbershop', 'queue', 'items');
+    const snapshot = await getDocs(queueCollection);
+
+    const items: QueueItem[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as QueueItem);
+    });
+
+    return items.sort((a, b) => parseInt(a.id) - parseInt(b.id));
   } catch (error) {
     console.error('Error loading queue:', error);
     return [];
@@ -63,33 +68,33 @@ export const loadQueue = async (): Promise<QueueItem[]> => {
 
 export const saveQueue = async (items: QueueItem[]): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'barbershop', 'queue'), {
-      items,
-      updatedAt: Timestamp.now()
-    });
-  } catch (error) {
-    console.error('Error saving queue:', error);
-    // If document doesn't exist, create it
-    try {
-      await setDoc(doc(db, 'barbershop', 'queue'), {
-        items,
+    const queueCollection = collection(db, 'barbershop', 'queue', 'items');
+
+    const savePromises = items.map((item) => {
+      const itemDoc = doc(queueCollection, item.id);
+      return setDoc(itemDoc, {
+        ...item,
         updatedAt: Timestamp.now()
       });
-    } catch (createError) {
-      console.error('Error creating queue document:', createError);
-      throw createError;
-    }
+    });
+
+    await Promise.all(savePromises);
+  } catch (error) {
+    console.error('Error saving queue:', error);
+    throw error;
   }
 };
 
 export const subscribeToQueue = (callback: (items: QueueItem[]) => void) => {
-  return onSnapshot(doc(db, 'barbershop', 'queue'), (doc) => {
-    if (doc.exists()) {
-      const data = doc.data();
-      callback(data.items || []);
-    } else {
-      callback([]);
-    }
+  const queueCollection = collection(db, 'barbershop', 'queue', 'items');
+
+  return onSnapshot(queueCollection, (snapshot) => {
+    const items: QueueItem[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as QueueItem);
+    });
+
+    callback(items.sort((a, b) => parseInt(a.id) - parseInt(b.id)));
   }, (error) => {
     console.error('Error subscribing to queue:', error);
     callback([]);
@@ -169,12 +174,19 @@ export const subscribeToSettings = (callback: (settings: Settings) => void) => {
 // Appointments operations
 export const loadAppointments = async (): Promise<Appointment[]> => {
   try {
-    const appointmentsDoc = await getDoc(doc(db, 'barbershop', 'appointments'));
-    if (appointmentsDoc.exists()) {
-      const data = appointmentsDoc.data();
-      return data.items || [];
-    }
-    return [];
+    const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
+    const snapshot = await getDocs(appointmentsCollection);
+
+    const items: Appointment[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as Appointment);
+    });
+
+    return items.sort((a, b) => {
+      const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
+      const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
+      return dateTimeA - dateTimeB;
+    });
   } catch (error) {
     console.error('Error loading appointments:', error);
     return [];
@@ -183,33 +195,39 @@ export const loadAppointments = async (): Promise<Appointment[]> => {
 
 export const saveAppointments = async (appointments: Appointment[]): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'barbershop', 'appointments'), {
-      items: appointments,
-      updatedAt: Timestamp.now()
-    });
-  } catch (error) {
-    console.error('Error saving appointments:', error);
-    // If document doesn't exist, create it
-    try {
-      await setDoc(doc(db, 'barbershop', 'appointments'), {
-        items: appointments,
+    const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
+
+    const savePromises = appointments.map((appointment) => {
+      const appointmentDoc = doc(appointmentsCollection, appointment.id);
+      return setDoc(appointmentDoc, {
+        ...appointment,
         updatedAt: Timestamp.now()
       });
-    } catch (createError) {
-      console.error('Error creating appointments document:', createError);
-      throw createError;
-    }
+    });
+
+    await Promise.all(savePromises);
+  } catch (error) {
+    console.error('Error saving appointments:', error);
+    throw error;
   }
 };
 
 export const subscribeToAppointments = (callback: (appointments: Appointment[]) => void) => {
-  return onSnapshot(doc(db, 'barbershop', 'appointments'), (doc) => {
-    if (doc.exists()) {
-      const data = doc.data();
-      callback(data.items || []);
-    } else {
-      callback([]);
-    }
+  const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
+
+  return onSnapshot(appointmentsCollection, (snapshot) => {
+    const items: Appointment[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as Appointment);
+    });
+
+    const sorted = items.sort((a, b) => {
+      const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
+      const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
+      return dateTimeA - dateTimeB;
+    });
+
+    callback(sorted);
   }, (error) => {
     console.error('Error subscribing to appointments:', error);
     callback([]);
