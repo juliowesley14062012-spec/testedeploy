@@ -48,14 +48,14 @@ const QueueList: React.FC<QueueListProps> = ({
   };
 
   const handlePositionClick = (item: QueueItem, index: number) => {
-    if (item.name) return; // Position already taken
-    
-    // Allow selection if developer mode is active, or if queue is not locked and shop is open
-    const canSelect = isDeveloperMode || (!isLocked && isShopOpen);
-    if (canSelect) {
-      onPositionSelect(item.id);
-    }
-  };
+  if (item.name) {
+    alert('Essa vaga já foi ocupada!');
+    return;
+  }
+
+  const canSelect = isDeveloperMode || (!isLocked && isShopOpen);
+  if (canSelect) onPositionSelect(Number(item.id));
+};
 
   if (!isShopOpen) {
     return (
