@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useConfig } from './hooks/useConfig';
 import { 
   loadQueue, 
-  saveQueue, 
+  // saveQueue, // não usar mais bulk save
+  saveQueueItem,
+  deleteQueueItem,
   subscribeToQueue,
   loadSettings,
   saveSettings,
@@ -39,10 +41,11 @@ function App() {
         ]);
         
         setQueue(queueData);
-        setIsQueueLocked(settingsData.isLocked);
-        setIsShopOpen(settingsData.isShopOpen);
-        if (settingsData.closedMessage) {
-          setClosedMessage(settingsData.closedMessage);
+        // se settings tiver campos diferentes, adapte:
+        setIsQueueLocked((settingsData as any).isLocked ?? false);
+        setIsShopOpen((settingsData as any).isShopOpen ?? true);
+        if ((settingsData as any).closedMessage) {
+          setClosedMessage((settingsData as any).closedMessage);
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -67,10 +70,10 @@ function App() {
 
     const unsubscribeSettings = subscribeToSettings((newSettings) => {
       console.log('Settings updated:', newSettings);
-      setIsQueueLocked(newSettings.isLocked);
-      setIsShopOpen(newSettings.isShopOpen);
-      if (newSettings.closedMessage) {
-        setClosedMessage(newSettings.closedMessage);
+      setIsQueueLocked((newSettings as any).isLocked ?? false);
+      setIsShopOpen((newSettings as any).isShopOpen ?? true);
+      if ((newSettings as any).closedMessage) {
+        setClosedMessage((newSettings as any).closedMessage);
       }
     });
 
@@ -84,14 +87,13 @@ function App() {
   useEffect(() => {
     if (!config) return;
     
-    const currentServing = queue.findIndex(item => item.name && !item.isCompleted);
+    const currentServing = queue.findIndex(item => (item as any).name && !(item as any).isCompleted);
     if (currentServing === -1) return;
 
-    const upcomingClients = queue.slice(currentServing + 1).filter(item => item.name && !item.isCompleted);
+    const upcomingClients = queue.slice(currentServing + 1).filter(item => (item as any).name && !(item as any).isCompleted);
     
     upcomingClients.forEach((client, index) => {
       if (index === 0) { // Next in line (1 person before)
-        // In a real app, this would send a WhatsApp message
         console.log(`Notification sent to ${client.phone}: Está chegando a sua vez na barbearia! Faltam 1 corte, não perca sua vez!`);
       } else if (index === 1) { // 2 people before
         console.log(`Notification sent to ${client.phone}: Está chegando a sua vez na barbearia! Faltam 2 cortes, não perca sua vez!`);
@@ -101,18 +103,20 @@ function App() {
 
   // Handlers
   const handlePositionSelect = (position: number) => {
-    const queueItem = queue.find(item => item.id === position);
-    if (!queueItem || queueItem.name) return; // Position already taken
+    const queueItem = queue.find(item => Number(item.id) === position || item.id === position);
+    if (!queueItem || (queueItem as any).name) return; // Position already taken
     
     setSelectedPosition(position);
     setCurrentView('form');
   };
 
+  // ====== AQUI: submit do formulário usando saveQueueItem (apenas o item) ======
   const handleFormSubmit = async (data: { name: string; phone: string; service: ServiceType }) => {
     if (selectedPosition === null || !config) return;
 
+    // Atualiza localmente a UI imediatamente (ótima UX)
     const updatedQueue = queue.map(item => 
-      item.id === selectedPosition 
+      (Number(item.id) === selectedPosition || item.id === selectedPosition)
         ? {
             ...item,
             name: data.name,
@@ -124,13 +128,24 @@ function App() {
     );
 
     setQueue(updatedQueue);
-    await saveQueue(updatedQueue);
 
-    // Send WhatsApp message (simulated)
+    // Salva APENAS o item alterado no Firestore para evitar sobrescritas
+    const itemToSave = updatedQueue.find(item => Number(item.id) === selectedPosition || item.id === selectedPosition);
+    if (itemToSave) {
+      try {
+        await saveQueueItem({
+          ...itemToSave,
+          // garantir forma do ID como string
+          id: itemToSave.id?.toString() ?? String(selectedPosition)
+        });
+      } catch (err) {
+        console.error('Erro salvando item da fila:', err);
+      }
+    }
+
+    // Simula envio de WhatsApp (ou integra com real API)
     const serviceInfo = `${data.service.name} - R$${data.service.price}`;
     const message = `Novo agendamento - Brayan Barbearia\nPosição: ${selectedPosition}\nNome: ${data.name}\nTelefone: ${data.phone}\nServiço: ${serviceInfo}`;
-    
-    // In a real app, this would use WhatsApp API
     console.log(`Message sent to ${config.barbershop.phone}:`, message);
 
     setCurrentView('home');
@@ -147,9 +162,35 @@ function App() {
     setCurrentView('home');
   };
 
+  // ====== AQUI: atualização feita pelo painel dev (salva individualmente e exclui removidos) ======
   const handleQueueUpdate = async (newQueue: QueueItem[]) => {
+    // Atualiza UI local
     setQueue(newQueue);
-    await saveQueue(newQueue);
+
+    try {
+      // IDs existentes antes (base atual)
+      const existingIds = new Set(queue.map(q => q.id?.toString()));
+      const newIds = new Set(newQueue.map(n => n.id?.toString()));
+
+      // Deletar itens removidos
+      const toDelete = Array.from(existingIds).filter(id => !newIds.has(id));
+      const deletePromises = toDelete.map(id => deleteQueueItem(id));
+
+      // Salvar/atualizar cada item novo/alterado
+      const savePromises = newQueue.map(item => {
+        // garantir que id não seja vazio
+        const itemWithId: QueueItem = {
+          ...item,
+          id: item.id ? item.id.toString() : String(item.id ?? Date.now())
+        };
+        return saveQueueItem(itemWithId);
+      });
+
+      await Promise.all([...savePromises, ...deletePromises]);
+      console.log(`Queue salva com sucesso: ${newQueue.length} itens sincronizados`);
+    } catch (err) {
+      console.error('Erro ao salvar fila (individual):', err);
+    }
   };
 
   const handleSettingsUpdate = async (newSettings: { isLocked: boolean; isShopOpen: boolean }) => {
