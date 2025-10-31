@@ -112,20 +112,30 @@ function App() {
 
   // ====== AQUI: submit do formulário usando saveQueueItem (apenas o item) ======
   const handleFormSubmit = async (data: { name: string; phone: string; service: ServiceType }) => {
-    if (selectedPosition === null || !config) return;
+  if (selectedPosition === null || !config) return;
 
-    // Atualiza localmente a UI imediatamente (ótima UX)
-    const updatedQueue = queue.map(item => 
-      (Number(item.id) === selectedPosition || item.id === selectedPosition)
-        ? {
-            ...item,
-            name: data.name,
-            phone: data.phone,
-            service: data.service,
-            timestamp: new Date().toISOString()
-          }
-        : item
-    );
+  const itemToSave: QueueItem = {
+    id: String(selectedPosition),
+    name: data.name,
+    phone: data.phone,
+    service: data.service,
+    timestamp: new Date().toISOString(),
+  };
+
+  // tenta reservar a vaga de forma atômica
+  const success = await tryBookSlot(String(selectedPosition), itemToSave);
+
+  if (!success) {
+    alert("Essa vaga acabou de ser ocupada. Escolha outra disponível.");
+    setCurrentView("home");
+    setSelectedPosition(null);
+    return;
+  }
+
+  console.log(`Novo agendamento confirmado: ${data.name} - vaga ${selectedPosition}`);
+  setCurrentView("home");
+  setSelectedPosition(null);
+};
 
     setQueue(updatedQueue);
 
