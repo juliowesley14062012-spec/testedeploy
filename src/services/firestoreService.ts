@@ -56,10 +56,14 @@ export const loadQueue = async (): Promise<QueueItem[]> => {
 
     const items: QueueItem[] = [];
     snapshot.forEach((doc) => {
-      items.push(doc.data() as QueueItem);
+      const data = doc.data() as QueueItem;
+      items.push({
+        ...data,
+        id: typeof data.id === 'string' ? parseInt(data.id) : data.id
+      });
     });
 
-    return items.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+    return items.sort((a, b) => a.id - b.id);
   } catch (error) {
     console.error('Error loading queue:', error);
     return [];
@@ -70,15 +74,26 @@ export const saveQueue = async (items: QueueItem[]): Promise<void> => {
   try {
     const queueCollection = collection(db, 'barbershop', 'queue', 'items');
 
+    // Get all existing document IDs to identify deletions
+    const existingSnapshot = await getDocs(queueCollection);
+    const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
+    const newIds = new Set(items.map(item => item.id.toString()));
+
+    // Delete queue items that were removed
+    const deletePromises = Array.from(existingIds)
+      .filter(id => !newIds.has(id))
+      .map(id => deleteDoc(doc(queueCollection, id)));
+
+    // Save/update queue items
     const savePromises = items.map((item) => {
-      const itemDoc = doc(queueCollection, item.id);
+      const itemDoc = doc(queueCollection, item.id.toString());
       return setDoc(itemDoc, {
         ...item,
         updatedAt: Timestamp.now()
       });
     });
 
-    await Promise.all(savePromises);
+    await Promise.all([...savePromises, ...deletePromises]);
   } catch (error) {
     console.error('Error saving queue:', error);
     throw error;
@@ -91,10 +106,14 @@ export const subscribeToQueue = (callback: (items: QueueItem[]) => void) => {
   return onSnapshot(queueCollection, (snapshot) => {
     const items: QueueItem[] = [];
     snapshot.forEach((doc) => {
-      items.push(doc.data() as QueueItem);
+      const data = doc.data() as QueueItem;
+      items.push({
+        ...data,
+        id: typeof data.id === 'string' ? parseInt(data.id) : data.id
+      });
     });
 
-    callback(items.sort((a, b) => parseInt(a.id) - parseInt(b.id)));
+    callback(items.sort((a, b) => a.id - b.id));
   }, (error) => {
     console.error('Error subscribing to queue:', error);
     callback([]);
@@ -179,7 +198,17 @@ export const loadAppointments = async (): Promise<Appointment[]> => {
 
     const items: Appointment[] = [];
     snapshot.forEach((doc) => {
-      items.push(doc.data() as Appointment);
+      const data = doc.data();
+      items.push({
+        id: doc.id,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        service: data.service,
+        date: data.date,
+        time: data.time,
+        status: data.status || 'scheduled',
+        createdAt: data.createdAt || Timestamp.now()
+      } as Appointment);
     });
 
     return items.sort((a, b) => {
@@ -197,6 +226,17 @@ export const saveAppointments = async (appointments: Appointment[]): Promise<voi
   try {
     const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
 
+    // Get all existing document IDs to identify deletions
+    const existingSnapshot = await getDocs(appointmentsCollection);
+    const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
+    const newIds = new Set(appointments.map(apt => apt.id));
+
+    // Delete appointments that were removed
+    const deletePromises = Array.from(existingIds)
+      .filter(id => !newIds.has(id))
+      .map(id => deleteDoc(doc(appointmentsCollection, id)));
+
+    // Save/update appointments
     const savePromises = appointments.map((appointment) => {
       const appointmentDoc = doc(appointmentsCollection, appointment.id);
       return setDoc(appointmentDoc, {
@@ -205,7 +245,7 @@ export const saveAppointments = async (appointments: Appointment[]): Promise<voi
       });
     });
 
-    await Promise.all(savePromises);
+    await Promise.all([...savePromises, ...deletePromises]);
   } catch (error) {
     console.error('Error saving appointments:', error);
     throw error;
@@ -218,7 +258,17 @@ export const subscribeToAppointments = (callback: (appointments: Appointment[]) 
   return onSnapshot(appointmentsCollection, (snapshot) => {
     const items: Appointment[] = [];
     snapshot.forEach((doc) => {
-      items.push(doc.data() as Appointment);
+      const data = doc.data();
+      items.push({
+        id: doc.id,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        service: data.service,
+        date: data.date,
+        time: data.time,
+        status: data.status || 'scheduled',
+        createdAt: data.createdAt || Timestamp.now()
+      } as Appointment);
     });
 
     const sorted = items.sort((a, b) => {
