@@ -8,11 +8,12 @@ import {
   deleteDoc,
   onSnapshot,
   Timestamp,
-  DocumentData
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
+} from "firebase/firestore";
+import { db } from "../firebase/config";
 
-// Types
+// ===============================
+// TYPES
+// ===============================
 export interface QueueItem {
   id: string;
   name: string;
@@ -20,7 +21,7 @@ export interface QueueItem {
   service: string;
   estimatedTime: number;
   addedAt: Timestamp;
-  status: 'waiting' | 'in-service' | 'completed';
+  status: "waiting" | "in-service" | "completed";
 }
 
 export interface Settings {
@@ -44,269 +45,246 @@ export interface Appointment {
   service: string;
   date: string;
   time: string;
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  status: "scheduled" | "confirmed" | "completed" | "cancelled";
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
-// Queue operations
+// ===============================
+// QUEUE OPERATIONS
+// ===============================
 export const loadQueue = async (): Promise<QueueItem[]> => {
   try {
-    const queueCollection = collection(db, 'barbershop', 'queue', 'items');
+    const queueCollection = collection(db, "barbershop", "queue", "items");
     const snapshot = await getDocs(queueCollection);
-
     const items: QueueItem[] = [];
-    snapshot.forEach((doc) => {
-      const data = doc.data() as QueueItem;
-      items.push({
-        ...data,
-        id: typeof data.id === 'string' ? parseInt(data.id) : data.id
-      });
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as QueueItem;
+      items.push({ ...data, id: docSnap.id });
     });
 
-    return items.sort((a, b) => a.id - b.id);
+    return items.sort((a, b) => parseInt(a.id) - parseInt(b.id));
   } catch (error) {
-    console.error('Error loading queue:', error);
+    console.error("Error loading queue:", error);
     return [];
   }
 };
 
-export const saveQueue = async (items: QueueItem[]): Promise<void> => {
+// 🔐 Nova função segura — salva apenas UM item da fila por vez
+export const saveQueueItem = async (item: QueueItem): Promise<void> => {
   try {
-    if (!items || items.length === 0) {
-      console.warn('Tentativa de salvar lista vazia ignorada');
-      return;
-    }
+    const queueCollection = collection(db, "barbershop", "queue", "items");
+    const id = item.id || crypto.randomUUID();
+    const itemDoc = doc(queueCollection, id);
 
-    const queueCollection = collection(db, 'barbershop', 'queue', 'items');
-
-    // Ensure all items have valid IDs
-    const validItems = items.map((item) => ({
-      ...item,
-      id: item.id || Date.now().toString()
-    }));
-
-    // Get all existing document IDs to identify deletions
-    const existingSnapshot = await getDocs(queueCollection);
-    const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
-    const newIds = new Set(validItems.map(item => item.id.toString()));
-
-    // Delete queue items that were removed
-    const deletePromises = Array.from(existingIds)
-      .filter(id => !newIds.has(id))
-      .map(id => deleteDoc(doc(queueCollection, id)));
-
-    // Save/update queue items
-    const savePromises = validItems.map((item) => {
-      const itemDoc = doc(queueCollection, item.id.toString());
-      return setDoc(itemDoc, {
+    await setDoc(
+      itemDoc,
+      {
         ...item,
-        updatedAt: Timestamp.now()
-      });
-    });
+        id,
+        addedAt: item.addedAt || Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      },
+      { merge: true }
+    );
 
-    await Promise.all([...savePromises, ...deletePromises]);
-    console.log(`Queue salva com sucesso: ${validItems.length} itens sincronizados`);
+    console.log(`[SYNC] Fila atualizada: ${id}`);
   } catch (error) {
-    console.error('Erro ao salvar fila:', error);
-    throw error;
+    console.error("Erro ao salvar item da fila:", error);
+  }
+};
+
+export const deleteQueueItem = async (id: string): Promise<void> => {
+  try {
+    const itemDoc = doc(db, "barbershop", "queue", "items", id);
+    await deleteDoc(itemDoc);
+  } catch (error) {
+    console.error("Erro ao excluir item da fila:", error);
   }
 };
 
 export const subscribeToQueue = (callback: (items: QueueItem[]) => void) => {
-  const queueCollection = collection(db, 'barbershop', 'queue', 'items');
+  const queueCollection = collection(db, "barbershop", "queue", "items");
 
-  return onSnapshot(queueCollection, (snapshot) => {
-    const items: QueueItem[] = [];
-    snapshot.forEach((doc) => {
-      const data = doc.data() as QueueItem;
-      items.push({
-        ...data,
-        id: typeof data.id === 'string' ? parseInt(data.id) : data.id
+  return onSnapshot(
+    queueCollection,
+    (snapshot) => {
+      const items: QueueItem[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as QueueItem;
+        items.push({ ...data, id: docSnap.id });
       });
-    });
-
-    const sorted = items.sort((a, b) => a.id - b.id);
-    console.log(`[SYNC] Fila atualizada em tempo real: ${sorted.length} itens`);
-    callback(sorted);
-  }, (error) => {
-    console.error('[ERRO] Falha ao escutar fila:', error);
-    callback([]);
-  });
+      callback(items.sort((a, b) => parseInt(a.id) - parseInt(b.id)));
+    },
+    (error) => {
+      console.error("Error subscribing to queue:", error);
+      callback([]);
+    }
+  );
 };
 
-// Settings operations
+// ===============================
+// SETTINGS
+// ===============================
 export const loadSettings = async (): Promise<Settings> => {
   try {
-    const settingsDoc = await getDoc(doc(db, 'barbershop', 'settings'));
+    const settingsDoc = await getDoc(doc(db, "barbershop", "settings"));
     if (settingsDoc.exists()) {
       return settingsDoc.data() as Settings;
     }
-    
-    // Default settings
+
     const defaultSettings: Settings = {
-      businessName: 'Minha Barbearia',
+      businessName: "Minha Barbearia",
       services: [
-        { name: 'Corte Simples', duration: 30, price: 25 },
-        { name: 'Corte + Barba', duration: 45, price: 35 },
-        { name: 'Barba', duration: 20, price: 15 }
+        { name: "Corte Simples", duration: 30, price: 25 },
+        { name: "Corte + Barba", duration: 45, price: 35 },
+        { name: "Barba", duration: 20, price: 15 },
       ],
-      workingHours: {
-        start: '08:00',
-        end: '18:00'
-      },
-      maxQueueSize: 10
+      workingHours: { start: "08:00", end: "18:00" },
+      maxQueueSize: 10,
     };
-    
-    await setDoc(doc(db, 'barbershop', 'settings'), defaultSettings);
+
+    await setDoc(doc(db, "barbershop", "settings"), defaultSettings);
     return defaultSettings;
   } catch (error) {
-    console.error('Error loading settings:', error);
+    console.error("Error loading settings:", error);
     throw error;
   }
 };
 
 export const saveSettings = async (settings: Settings): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'barbershop', 'settings'), {
-      ...settings,
-      updatedAt: Timestamp.now()
-    });
+    await setDoc(
+      doc(db, "barbershop", "settings"),
+      { ...settings, updatedAt: Timestamp.now() },
+      { merge: true }
+    );
   } catch (error) {
-    console.error('Error saving settings:', error);
-    // If document doesn't exist, create it
-    try {
-      await setDoc(doc(db, 'barbershop', 'settings'), {
-        ...settings,
-        updatedAt: Timestamp.now()
-      });
-    } catch (createError) {
-      console.error('Error creating settings document:', createError);
-      throw createError;
-    }
+    console.error("Error saving settings:", error);
   }
 };
 
 export const subscribeToSettings = (callback: (settings: Settings) => void) => {
-  return onSnapshot(doc(db, 'barbershop', 'settings'), async (doc) => {
-    if (doc.exists()) {
-      callback(doc.data() as Settings);
-    } else {
-      // Load default settings if document doesn't exist
-      try {
-        const defaultSettings = await loadSettings();
-        callback(defaultSettings);
-      } catch (error) {
-        console.error('Error loading default settings:', error);
-      }
-    }
-  }, (error) => {
-    console.error('Error subscribing to settings:', error);
-  });
+  return onSnapshot(
+    doc(db, "barbershop", "settings"),
+    (docSnap) => {
+      if (docSnap.exists()) callback(docSnap.data() as Settings);
+    },
+    (error) => console.error("Error subscribing to settings:", error)
+  );
 };
 
-// Appointments operations
+// ===============================
+// APPOINTMENTS (AGENDAMENTOS)
+// ===============================
+
+// 🔄 Carregar todos os agendamentos
 export const loadAppointments = async (): Promise<Appointment[]> => {
   try {
-    const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
+    const appointmentsCollection = collection(
+      db,
+      "barbershop",
+      "appointments",
+      "items"
+    );
     const snapshot = await getDocs(appointmentsCollection);
-
     const items: Appointment[] = [];
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      items.push({
-        id: doc.id,
-        clientName: data.clientName,
-        clientPhone: data.clientPhone,
-        service: data.service,
-        date: data.date,
-        time: data.time,
-        status: data.status || 'scheduled',
-        createdAt: data.createdAt || Timestamp.now()
-      } as Appointment);
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Appointment;
+      items.push({ ...data, id: docSnap.id });
     });
 
-    return items.sort((a, b) => {
-      const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
-      const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
-      return dateTimeA - dateTimeB;
-    });
+    return items.sort(
+      (a, b) =>
+        new Date(`${a.date}T${a.time}`).getTime() -
+        new Date(`${b.date}T${b.time}`).getTime()
+    );
   } catch (error) {
-    console.error('Error loading appointments:', error);
+    console.error("Error loading appointments:", error);
     return [];
   }
 };
 
-export const saveAppointments = async (appointments: Appointment[]): Promise<void> => {
+// ✅ Salvar apenas UM agendamento (evita sobrescrever outros)
+export const saveAppointment = async (appointment: Appointment): Promise<void> => {
   try {
-    if (!appointments || appointments.length === 0) {
-      console.warn('Tentativa de salvar lista vazia ignorada');
-      return;
-    }
+    const appointmentsCollection = collection(
+      db,
+      "barbershop",
+      "appointments",
+      "items"
+    );
+    const id = appointment.id || crypto.randomUUID();
+    const appointmentDoc = doc(appointmentsCollection, id);
 
-    const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
-
-    // Ensure all items have valid IDs
-    const validAppointments = appointments.map((appointment) => ({
-      ...appointment,
-      id: appointment.id || Date.now().toString()
-    }));
-
-    // Get all existing document IDs to identify deletions
-    const existingSnapshot = await getDocs(appointmentsCollection);
-    const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
-    const newIds = new Set(validAppointments.map(apt => apt.id));
-
-    // Delete appointments that were removed
-    const deletePromises = Array.from(existingIds)
-      .filter(id => !newIds.has(id))
-      .map(id => deleteDoc(doc(appointmentsCollection, id)));
-
-    // Save/update appointments
-    const savePromises = validAppointments.map((appointment) => {
-      const appointmentDoc = doc(appointmentsCollection, appointment.id);
-      return setDoc(appointmentDoc, {
+    await setDoc(
+      appointmentDoc,
+      {
         ...appointment,
-        updatedAt: Timestamp.now()
-      });
-    });
+        id,
+        createdAt: appointment.createdAt || Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      },
+      { merge: true }
+    );
 
-    await Promise.all([...savePromises, ...deletePromises]);
-    console.log(`Agendamentos salvos com sucesso: ${validAppointments.length} itens sincronizados`);
+    console.log(`[SYNC] Agendamento salvo com sucesso: ${id}`);
   } catch (error) {
-    console.error('Erro ao salvar agendamentos:', error);
-    throw error;
+    console.error("Erro ao salvar agendamento:", error);
   }
 };
 
-export const subscribeToAppointments = (callback: (appointments: Appointment[]) => void) => {
-  const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
+// ❌ Excluir agendamento
+export const deleteAppointment = async (id: string): Promise<void> => {
+  try {
+    const appointmentDoc = doc(
+      db,
+      "barbershop",
+      "appointments",
+      "items",
+      id
+    );
+    await deleteDoc(appointmentDoc);
+    console.log(`[SYNC] Agendamento removido: ${id}`);
+  } catch (error) {
+    console.error("Erro ao excluir agendamento:", error);
+  }
+};
 
-  return onSnapshot(appointmentsCollection, (snapshot) => {
-    const items: Appointment[] = [];
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      items.push({
-        id: doc.id,
-        clientName: data.clientName,
-        clientPhone: data.clientPhone,
-        service: data.service,
-        date: data.date,
-        time: data.time,
-        status: data.status || 'scheduled',
-        createdAt: data.createdAt || Timestamp.now()
-      } as Appointment);
-    });
+// 🔁 Assinar atualizações em tempo real
+export const subscribeToAppointments = (
+  callback: (appointments: Appointment[]) => void
+) => {
+  const appointmentsCollection = collection(
+    db,
+    "barbershop",
+    "appointments",
+    "items"
+  );
 
-    const sorted = items.sort((a, b) => {
-      const dateTimeA = new Date(`${a.date}T${a.time}`).getTime();
-      const dateTimeB = new Date(`${b.date}T${b.time}`).getTime();
-      return dateTimeA - dateTimeB;
-    });
+  return onSnapshot(
+    appointmentsCollection,
+    (snapshot) => {
+      const items: Appointment[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Appointment;
+        items.push({ ...data, id: docSnap.id });
+      });
 
-    console.log(`[SYNC] Agendamentos atualizados em tempo real: ${sorted.length} itens`);
-    callback(sorted);
-  }, (error) => {
-    console.error('[ERRO] Falha ao escutar agendamentos:', error);
-    callback([]);
-  });
+      const sorted = items.sort(
+        (a, b) =>
+          new Date(`${a.date}T${a.time}`).getTime() -
+          new Date(`${b.date}T${b.time}`).getTime()
+      );
+
+      console.log(`[SYNC] ${sorted.length} agendamentos sincronizados`);
+      callback(sorted);
+    },
+    (error) => {
+      console.error("Error subscribing to appointments:", error);
+      callback([]);
+    }
+  );
 };
