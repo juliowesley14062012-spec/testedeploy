@@ -16,8 +16,8 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
   const [formData, setFormData] = useState({
     date: '',
     time: '',
-    name: '',
-    phone: '',
+    clientName: '',
+    clientPhone: '',
     service: services[0],
     notes: ''
   });
@@ -51,21 +51,27 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newAppointment: FutureAppointment = {
       id: Date.now().toString(),
-      ...formData
+      clientName: formData.clientName,
+      clientPhone: formData.clientPhone,
+      service: formData.service,
+      date: formData.date,
+      time: formData.time,
+      status: 'scheduled',
+      notes: formData.notes
     };
 
     const updatedAppointments = [...appointments, newAppointment];
     setAppointments(updatedAppointments);
     await saveAppointments(updatedAppointments);
-    
+
     setFormData({
       date: '',
       time: '',
-      name: '',
-      phone: '',
+      clientName: '',
+      clientPhone: '',
       service: services[0],
       notes: ''
     });
@@ -172,20 +178,20 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                   <label className="block text-gray-800 font-medium mb-2">Nome</label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    value={formData.clientName}
+                    onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
                     className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="Nome do cliente"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-gray-800 font-medium mb-2">WhatsApp</label>
                   <input
                     type="tel"
-                    value={formData.phone}
-                    onChange={handlePhoneChange}
+                    value={formData.clientPhone}
+                    onChange={(e) => setFormData({ ...formData, clientPhone: formatPhone(e.target.value) })}
                     className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="(00) 00000-0000"
                     maxLength={15}
@@ -276,12 +282,12 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                       <div className="flex items-center text-gray-800">
                         <User className="w-4 h-4 mr-2 text-gray-600" />
-                        <span>{appointment.name}</span>
+                        <span>{appointment.clientName}</span>
                       </div>
-                      
+
                       <div className="flex items-center text-gray-800">
                         <Phone className="w-4 h-4 mr-2 text-gray-600" />
-                        <span>{appointment.phone}</span>
+                        <span>{appointment.clientPhone}</span>
                       </div>
                       
                       <div className="text-blue-600 font-medium">
