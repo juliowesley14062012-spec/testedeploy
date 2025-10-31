@@ -72,12 +72,23 @@ export const loadQueue = async (): Promise<QueueItem[]> => {
 
 export const saveQueue = async (items: QueueItem[]): Promise<void> => {
   try {
+    if (!items || items.length === 0) {
+      console.warn('Tentativa de salvar lista vazia ignorada');
+      return;
+    }
+
     const queueCollection = collection(db, 'barbershop', 'queue', 'items');
+
+    // Ensure all items have valid IDs
+    const validItems = items.map((item) => ({
+      ...item,
+      id: item.id || Date.now().toString()
+    }));
 
     // Get all existing document IDs to identify deletions
     const existingSnapshot = await getDocs(queueCollection);
     const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
-    const newIds = new Set(items.map(item => item.id.toString()));
+    const newIds = new Set(validItems.map(item => item.id.toString()));
 
     // Delete queue items that were removed
     const deletePromises = Array.from(existingIds)
@@ -85,7 +96,7 @@ export const saveQueue = async (items: QueueItem[]): Promise<void> => {
       .map(id => deleteDoc(doc(queueCollection, id)));
 
     // Save/update queue items
-    const savePromises = items.map((item) => {
+    const savePromises = validItems.map((item) => {
       const itemDoc = doc(queueCollection, item.id.toString());
       return setDoc(itemDoc, {
         ...item,
@@ -94,8 +105,9 @@ export const saveQueue = async (items: QueueItem[]): Promise<void> => {
     });
 
     await Promise.all([...savePromises, ...deletePromises]);
+    console.log(`Queue salva com sucesso: ${validItems.length} itens sincronizados`);
   } catch (error) {
-    console.error('Error saving queue:', error);
+    console.error('Erro ao salvar fila:', error);
     throw error;
   }
 };
@@ -113,9 +125,11 @@ export const subscribeToQueue = (callback: (items: QueueItem[]) => void) => {
       });
     });
 
-    callback(items.sort((a, b) => a.id - b.id));
+    const sorted = items.sort((a, b) => a.id - b.id);
+    console.log(`[SYNC] Fila atualizada em tempo real: ${sorted.length} itens`);
+    callback(sorted);
   }, (error) => {
-    console.error('Error subscribing to queue:', error);
+    console.error('[ERRO] Falha ao escutar fila:', error);
     callback([]);
   });
 };
@@ -224,12 +238,23 @@ export const loadAppointments = async (): Promise<Appointment[]> => {
 
 export const saveAppointments = async (appointments: Appointment[]): Promise<void> => {
   try {
+    if (!appointments || appointments.length === 0) {
+      console.warn('Tentativa de salvar lista vazia ignorada');
+      return;
+    }
+
     const appointmentsCollection = collection(db, 'barbershop', 'appointments', 'items');
+
+    // Ensure all items have valid IDs
+    const validAppointments = appointments.map((appointment) => ({
+      ...appointment,
+      id: appointment.id || Date.now().toString()
+    }));
 
     // Get all existing document IDs to identify deletions
     const existingSnapshot = await getDocs(appointmentsCollection);
     const existingIds = new Set(existingSnapshot.docs.map(doc => doc.id));
-    const newIds = new Set(appointments.map(apt => apt.id));
+    const newIds = new Set(validAppointments.map(apt => apt.id));
 
     // Delete appointments that were removed
     const deletePromises = Array.from(existingIds)
@@ -237,7 +262,7 @@ export const saveAppointments = async (appointments: Appointment[]): Promise<voi
       .map(id => deleteDoc(doc(appointmentsCollection, id)));
 
     // Save/update appointments
-    const savePromises = appointments.map((appointment) => {
+    const savePromises = validAppointments.map((appointment) => {
       const appointmentDoc = doc(appointmentsCollection, appointment.id);
       return setDoc(appointmentDoc, {
         ...appointment,
@@ -246,8 +271,9 @@ export const saveAppointments = async (appointments: Appointment[]): Promise<voi
     });
 
     await Promise.all([...savePromises, ...deletePromises]);
+    console.log(`Agendamentos salvos com sucesso: ${validAppointments.length} itens sincronizados`);
   } catch (error) {
-    console.error('Error saving appointments:', error);
+    console.error('Erro ao salvar agendamentos:', error);
     throw error;
   }
 };
@@ -277,9 +303,10 @@ export const subscribeToAppointments = (callback: (appointments: Appointment[]) 
       return dateTimeA - dateTimeB;
     });
 
+    console.log(`[SYNC] Agendamentos atualizados em tempo real: ${sorted.length} itens`);
     callback(sorted);
   }, (error) => {
-    console.error('Error subscribing to appointments:', error);
+    console.error('[ERRO] Falha ao escutar agendamentos:', error);
     callback([]);
   });
 };
