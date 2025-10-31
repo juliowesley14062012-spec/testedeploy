@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Settings, 
-  Trash2, 
-  MoveUp, 
-  MoveDown, 
-  CheckCircle, 
+import {
+  Settings,
+  Trash2,
+  MoveUp,
+  MoveDown,
+  CheckCircle,
   XCircle,
   Lock,
   Unlock,
@@ -14,6 +14,7 @@ import {
   Home
 } from 'lucide-react';
 import { QueueItem } from '../types';
+import { saveQueueItem, deleteQueueItem } from '../services/firestoreService';
 
 interface DeveloperPanelProps {
   queue: QueueItem[];
@@ -47,19 +48,21 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
   const [editingMessage, setEditingMessage] = useState(false);
   const [tempMessage, setTempMessage] = useState(closedMessage);
 
+  // === LOGIN ===
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === '2654') {
       setIsAuthenticated(true);
+      console.log('[DEV] Login autorizado.');
     } else {
       alert('Senha incorreta!');
     }
     setPassword('');
   };
 
+  // === CONTROLE DE LOJA ===
   const handleShopToggle = () => {
     if (isShopOpen) {
-      // Fechando a barbearia - permitir editar mensagem
       setEditingMessage(true);
       setTempMessage(closedMessage);
     }
@@ -69,113 +72,87 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
   const saveClosedMessage = () => {
     setClosedMessage(tempMessage);
     setEditingMessage(false);
+    console.log('[DEV] Mensagem de loja fechada atualizada.');
   };
 
   const cancelEditMessage = () => {
     setTempMessage(closedMessage);
     setEditingMessage(false);
   };
-  const deleteCustomer = (id: number) => {
-    if (confirm('Tem certeza que deseja remover este cliente?')) {
-      const updatedQueue = queue.map(item => 
-        item.id === id 
-          ? { ...item, name: '', phone: '', service: null, isCompleted: false, timestamp: null }
-          : item
-      );
-      setQueue(updatedQueue);
-    }
+
+  // === AÇÕES NA FILA ===
+  const deleteCustomer = async (id: number | string) => {
+    if (!confirm('Tem certeza que deseja remover este cliente?')) return;
+    await deleteQueueItem(id.toString());
+    setQueue(queue.map(q => (q.id === id ? { ...q, name: '', phone: '', service: null, isCompleted: false } : q)));
+    console.log(`[DEV] Cliente ${id} removido.`);
   };
 
-  const moveUp = (id: number) => {
-    const currentIndex = queue.findIndex(item => item.id === id);
-    if (currentIndex > 0) {
-      const newQueue = [...queue];
-      [newQueue[currentIndex], newQueue[currentIndex - 1]] = [newQueue[currentIndex - 1], newQueue[currentIndex]];
-      // Update IDs to match positions
-      newQueue.forEach((item, index) => {
-        item.id = index + 1;
-      });
-      setQueue(newQueue);
-    }
+  const moveUp = async (id: number | string) => {
+    const idx = queue.findIndex(item => item.id === id);
+    if (idx <= 0) return;
+    const newQueue = [...queue];
+    [newQueue[idx - 1], newQueue[idx]] = [newQueue[idx], newQueue[idx - 1]];
+    newQueue.forEach((item, i) => (item.id = (i + 1).toString()));
+    setQueue(newQueue);
+    await Promise.all(newQueue.map(item => saveQueueItem(item)));
   };
 
-  const moveDown = (id: number) => {
-    const currentIndex = queue.findIndex(item => item.id === id);
-    if (currentIndex < queue.length - 1) {
-      const newQueue = [...queue];
-      [newQueue[currentIndex], newQueue[currentIndex + 1]] = [newQueue[currentIndex + 1], newQueue[currentIndex]];
-      // Update IDs to match positions
-      newQueue.forEach((item, index) => {
-        item.id = index + 1;
-      });
-      setQueue(newQueue);
-    }
+  const moveDown = async (id: number | string) => {
+    const idx = queue.findIndex(item => item.id === id);
+    if (idx < 0 || idx === queue.length - 1) return;
+    const newQueue = [...queue];
+    [newQueue[idx + 1], newQueue[idx]] = [newQueue[idx], newQueue[idx + 1]];
+    newQueue.forEach((item, i) => (item.id = (i + 1).toString()));
+    setQueue(newQueue);
+    await Promise.all(newQueue.map(item => saveQueueItem(item)));
   };
 
-  const markCompleted = (id: number) => {
+  const markCompleted = async (id: number | string) => {
     const updatedQueue = queue.map(item =>
       item.id === id ? { ...item, isCompleted: !item.isCompleted } : item
     );
     setQueue(updatedQueue);
+    const target = updatedQueue.find(item => item.id === id);
+    if (target) await saveQueueItem(target);
   };
 
-  const changeQueueSize = () => {
+  const changeQueueSize = async () => {
     const newSize = parseInt(prompt('Número total de vagas desejadas:') || queue.length.toString());
-    if (newSize > 0 && newSize !== queue.length) {
-      let newQueue = [...queue];
-      
-      if (newSize > queue.length) {
-        // Add more slots
-        const slotsToAdd = newSize - queue.length;
-        const newSlots = Array.from({ length: slotsToAdd }, (_, i) => ({
-          id: queue.length + i + 1,
-          name: '',
-          phone: '',
-          service: null,
-          isCompleted: false,
-          timestamp: null
-        }));
-        newQueue = [...queue, ...newSlots];
-      } else {
-        // Remove slots (only empty ones)
-        newQueue = queue.slice(0, newSize);
-      }
-      
-      // Update IDs to match positions
-      newQueue.forEach((item, index) => {
-        item.id = index + 1;
-      });
-      
-      setQueue(newQueue);
-    }
-  };
+    if (newSize <= 0) return;
 
-  const addMoreSlots = () => {
-    const slotsToAdd = parseInt(prompt('Quantas vagas adicionar?') || '0');
-    if (slotsToAdd > 0) {
-      const newSlots = Array.from({ length: slotsToAdd }, (_, i) => ({
-        id: queue.length + i + 1,
+    let newQueue = [...queue];
+    if (newSize > queue.length) {
+      const addCount = newSize - queue.length;
+      const newSlots = Array.from({ length: addCount }, (_, i) => ({
+        id: (queue.length + i + 1).toString(),
         name: '',
         phone: '',
         service: null,
-        isCompleted: false,
-        timestamp: null
+        isCompleted: false
       }));
-      setQueue([...queue, ...newSlots]);
+      newQueue = [...queue, ...newSlots];
+    } else {
+      newQueue = queue.slice(0, newSize);
     }
+
+    setQueue(newQueue);
+    await Promise.all(newQueue.map(item => saveQueueItem(item)));
+    console.log(`[DEV] Tamanho da fila atualizado: ${newSize}`);
   };
 
-  const clearCompletedSlots = () => {
-    if (confirm('Limpar todos os slots concluídos?')) {
-      const updatedQueue = queue.map(item =>
-        item.isCompleted
-          ? { ...item, name: '', phone: '', service: null, isCompleted: false, timestamp: null }
-          : item
-      );
-      setQueue(updatedQueue);
-    }
+  const clearCompletedSlots = async () => {
+    if (!confirm('Limpar todos os slots concluídos?')) return;
+    const updated = queue.map(item =>
+      item.isCompleted
+        ? { ...item, name: '', phone: '', service: null, isCompleted: false }
+        : item
+    );
+    setQueue(updated);
+    await Promise.all(updated.map(item => saveQueueItem(item)));
   };
 
+  // === LOGIN SCREEN ===
   if (!isAuthenticated) {
     return (
       <div className="max-w-md mx-auto">
@@ -191,13 +168,13 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent mb-4"
+              className="w-full px-4 py-3 border rounded-lg mb-4"
               placeholder="Digite a senha"
               required
             />
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-300"
+              className="w-full px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-lg hover:from-red-700 hover:to-red-800"
             >
               Entrar
             </button>
@@ -205,7 +182,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
 
           <button
             onClick={onBackToHome}
-            className="w-full mt-4 px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            className="w-full mt-4 px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
           >
             Voltar ao início
           </button>
@@ -214,39 +191,36 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
     );
   }
 
+  // === MAIN PANEL ===
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-200 p-8 shadow-lg">
+      <div className="bg-white/95 rounded-xl border p-8 shadow-lg">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-4 md:mb-0">Painel do Desenvolvedor</h2>
-          
+
           <div className="flex flex-wrap gap-3">
             <button
               onClick={handleShopToggle}
-              className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                isShopOpen
-                  ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
+              className={`px-4 py-2 rounded-lg font-semibold ${
+                isShopOpen ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+              } text-white`}
             >
               {isShopOpen ? 'Barbearia Aberta' : 'Barbearia Fechada'}
             </button>
 
             <button
               onClick={() => setIsLocked(!isLocked)}
-              className={`flex items-center px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
-                isLocked
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+              className={`flex items-center px-4 py-2 rounded-lg font-semibold ${
+                isLocked ? 'bg-red-600' : 'bg-blue-600'
+              } text-white hover:opacity-90`}
             >
               {isLocked ? <Lock className="w-4 h-4 mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
-              {isLocked ? 'Fila Travada (Só Dev)' : 'Travar Fila'}
+              {isLocked ? 'Fila Travada (Dev)' : 'Travar Fila'}
             </button>
 
             <button
               onClick={onViewAppointments}
-              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
               <Calendar className="w-4 h-4 mr-2" />
               Outros Agendamentos
@@ -254,7 +228,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
 
             <button
               onClick={onBackToHome}
-              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
             >
               <Home className="w-4 h-4 mr-2" />
               Início
@@ -262,7 +236,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
 
             <button
               onClick={onLogout}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sair
@@ -270,47 +244,37 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
           </div>
         </div>
 
-        {/* Edit Closed Message */}
         {editingMessage && (
           <div className="mb-8 bg-yellow-50 rounded-lg p-6 border border-yellow-300">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Editar Mensagem de Fechado</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-800 font-medium mb-2">Mensagem que aparece quando a barbearia está fechada:</label>
-                <input
-                  type="text"
-                  value={tempMessage}
-                  onChange={(e) => setTempMessage(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  placeholder="Digite a mensagem..."
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={saveClosedMessage}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Salvar Mensagem
-                </button>
-                
-                <button
-                  onClick={cancelEditMessage}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
+            <h3 className="text-lg font-semibold mb-4">Editar Mensagem de Fechado</h3>
+            <input
+              type="text"
+              value={tempMessage}
+              onChange={(e) => setTempMessage(e.target.value)}
+              className="w-full px-4 py-3 border rounded-lg mb-4"
+              placeholder="Digite a mensagem..."
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={saveClosedMessage}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Salvar
+              </button>
+              <button
+                onClick={cancelEditMessage}
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         )}
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <button
             onClick={changeQueueSize}
-            className="flex items-center justify-center px-4 py-3 bg-green-100 border border-green-500 text-green-800 rounded-lg hover:bg-green-200 transition-all font-semibold"
+            className="flex items-center justify-center px-4 py-3 bg-green-100 border border-green-500 rounded-lg hover:bg-green-200"
           >
             <Hash className="w-5 h-5 mr-2" />
             Número de Vagas
@@ -318,7 +282,7 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
 
           <button
             onClick={clearCompletedSlots}
-            className="flex items-center justify-center px-4 py-3 bg-orange-100 border border-orange-500 text-orange-800 rounded-lg hover:bg-orange-200 transition-all font-semibold"
+            className="flex items-center justify-center px-4 py-3 bg-orange-100 border border-orange-500 rounded-lg hover:bg-orange-200"
           >
             <CheckCircle className="w-5 h-5 mr-2" />
             Limpar Concluídos
@@ -332,80 +296,43 @@ const DeveloperPanel: React.FC<DeveloperPanelProps> = ({
           </div>
         </div>
 
-        {/* Queue Management */}
         <div className="space-y-3">
           <h3 className="text-xl font-semibold text-gray-800 mb-4">Gerenciar Fila</h3>
-          
+
           {queue.map((item, index) => (
             <div
               key={item.id}
-              className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+              className={`p-4 rounded-lg border-2 transition-all ${
                 item.isCompleted
                   ? 'bg-green-100 border-green-500'
                   : item.name
                   ? 'bg-blue-50 border-blue-400'
-                  : 'bg-gray-50 border-gray-400'
+                  : 'bg-gray-50 border-gray-300'
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-4">
-                    <span className="text-gray-800 font-bold text-lg">
-                      {item.id}º
+                  <span className="text-gray-800 font-bold text-lg">{item.id}º </span>
+                  <span>{item.name || 'Vago'}</span>
+                  {item.service && (
+                    <span className="text-blue-600 text-sm ml-2">
+                      {item.service.name} - R$ {item.service.price}
                     </span>
-                    <div>
-                      <div className="text-gray-800 font-medium">
-                        {item.name || 'Vago'}
-                      </div>
-                      {item.phone && (
-                        <div className="text-gray-600 text-sm">{item.phone}</div>
-                      )}
-                      {item.service && (
-                        <div className="text-blue-600 text-sm">
-                          {item.service.name} - R$ {item.service.price}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 {item.name && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => moveUp(item.id)}
-                      disabled={index === 0}
-                      className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Mover para cima"
-                    >
+                  <div className="flex gap-2">
+                    <button onClick={() => moveUp(item.id)} className="p-2 bg-blue-600 text-white rounded">
                       <MoveUp className="w-4 h-4" />
                     </button>
-
-                    <button
-                      onClick={() => moveDown(item.id)}
-                      disabled={index === queue.length - 1}
-                      className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Mover para baixo"
-                    >
+                    <button onClick={() => moveDown(item.id)} className="p-2 bg-blue-600 text-white rounded">
                       <MoveDown className="w-4 h-4" />
                     </button>
-
-                    <button
-                      onClick={() => markCompleted(item.id)}
-                      className={`p-2 rounded transition-colors ${
-                        item.isCompleted
-                          ? 'bg-orange-600 hover:bg-orange-700 text-white'
-                          : 'bg-green-600 hover:bg-green-700 text-white'
-                      }`}
-                      title={item.isCompleted ? 'Marcar como pendente' : 'Marcar como concluído'}
-                    >
+                    <button onClick={() => markCompleted(item.id)} className="p-2 bg-green-600 text-white rounded">
                       {item.isCompleted ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                     </button>
-
-                    <button
-                      onClick={() => deleteCustomer(item.id)}
-                      className="p-2 bg-red-600 text-white rounded hover:bg-red-700"
-                      title="Remover cliente"
-                    >
+                    <button onClick={() => deleteCustomer(item.id)} className="p-2 bg-red-600 text-white rounded">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
