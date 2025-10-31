@@ -14,11 +14,12 @@ export interface QueueItem {
 
 export interface FutureAppointment {
   id: string;
+  clientName: string;
+  clientPhone: string;
+  service: ServiceType;
   date: string;
   time: string;
-  name: string;
-  phone: string;
-  service: ServiceType;
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
   notes?: string;
 }
 
