@@ -1,33 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { useConfig } from './hooks/useConfig';
-import { 
-  loadQueue, 
+import React, { useState, useEffect } from "react";
+import { useConfig } from "./hooks/useConfig";
+import {
+  loadQueue,
   saveQueueItem,
   deleteQueueItem,
   subscribeToQueue,
   loadSettings,
   saveSettings,
   subscribeToSettings,
-  tryBookSlot // 🔥 nova função no firestoreService
-} from './services/firestoreService';
-import Header from './components/Header';
-import QueueList from './components/QueueList';
-import CustomerForm from './components/CustomerForm';
-import DeveloperPanel from './components/DeveloperPanel';
-import OtherAppointments from './components/OtherAppointments';
-import Footer from './components/Footer';
-import { QueueItem, ServiceType } from './types';
+  tryBookSlot,
+} from "./services/firestoreService";
+import Header from "./components/Header";
+import QueueList from "./components/QueueList";
+import CustomerForm from "./components/CustomerForm";
+import DeveloperPanel from "./components/DeveloperPanel";
+import OtherAppointments from "./components/OtherAppointments";
+import Footer from "./components/Footer";
+import { QueueItem, ServiceType } from "./types";
 
 function App() {
   const { config, loading, error } = useConfig();
-  
-  const [currentView, setCurrentView] = useState<'home' | 'form' | 'developer' | 'appointments'>('home');
+  const [currentView, setCurrentView] = useState<
+    "home" | "form" | "developer" | "appointments"
+  >("home");
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
   const [isDeveloperMode, setIsDeveloperMode] = useState(false);
   const [isQueueLocked, setIsQueueLocked] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
-  const [closedMessage, setClosedMessage] = useState("Volte mais tarde para agendar seu corte!");
-  
+  const [closedMessage, setClosedMessage] = useState(
+    "Volte mais tarde para agendar seu corte!"
+  );
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
@@ -37,14 +39,15 @@ function App() {
       try {
         const [queueData, settingsData] = await Promise.all([
           loadQueue(),
-          loadSettings()
+          loadSettings(),
         ]);
         setQueue(queueData);
         setIsQueueLocked(settingsData?.isLocked ?? false);
         setIsShopOpen(settingsData?.isShopOpen ?? true);
-        if (settingsData?.closedMessage) setClosedMessage(settingsData.closedMessage);
+        if (settingsData?.closedMessage)
+          setClosedMessage(settingsData.closedMessage);
       } catch (error) {
-        console.error('Erro carregando dados iniciais:', error);
+        console.error("Erro carregando dados iniciais:", error);
       } finally {
         setIsLoadingData(false);
       }
@@ -59,7 +62,8 @@ function App() {
     const unsubSettings = subscribeToSettings((newSettings) => {
       setIsQueueLocked(newSettings?.isLocked ?? false);
       setIsShopOpen(newSettings?.isShopOpen ?? true);
-      if (newSettings?.closedMessage) setClosedMessage(newSettings.closedMessage);
+      if (newSettings?.closedMessage)
+        setClosedMessage(newSettings.closedMessage);
     });
     return () => {
       unsubQueue();
@@ -67,28 +71,20 @@ function App() {
     };
   }, [isLoadingData]);
 
-  // 🔹 Notificações
-  useEffect(() => {
-    if (!config) return;
-    const currentServing = queue.findIndex(item => item.name && !item.isCompleted);
-    if (currentServing === -1) return;
-    const upcomingClients = queue.slice(currentServing + 1).filter(item => item.name && !item.isCompleted);
-    upcomingClients.forEach((client, index) => {
-      if (index === 0) console.log(`Aviso: ${client.phone} está a 1 corte da vez.`);
-      else if (index === 1) console.log(`Aviso: ${client.phone} está a 2 cortes da vez.`);
-    });
-  }, [queue, config]);
-
   // 🔹 Escolher vaga
   const handlePositionSelect = (position: number) => {
-    const queueItem = queue.find(item => Number(item.id) === position);
+    const queueItem = queue.find((item) => Number(item.id) === position);
     if (!queueItem || queueItem.name) return;
     setSelectedPosition(position);
-    setCurrentView('form');
+    setCurrentView("form");
   };
 
-  // 🔹 Agendar vaga (com proteção)
-  const handleFormSubmit = async (data: { name: string; phone: string; service: ServiceType }) => {
+  // 🔹 Agendar vaga com proteção atômica
+  const handleFormSubmit = async (data: {
+    name: string;
+    phone: string;
+    service: ServiceType;
+  }) => {
     if (selectedPosition === null || !config) return;
 
     const itemToSave: QueueItem = {
@@ -108,40 +104,46 @@ function App() {
       return;
     }
 
-    console.log(`Novo agendamento confirmado: ${data.name} - vaga ${selectedPosition}`);
+    console.log(
+      `✅ Novo agendamento confirmado: ${data.name} - vaga ${selectedPosition}`
+    );
     setCurrentView("home");
     setSelectedPosition(null);
   };
 
-  // 🔹 Painel do desenvolvedor
   const handleDeveloperLogin = () => {
     setIsDeveloperMode(true);
-    setCurrentView('developer');
+    setCurrentView("developer");
   };
 
   const handleDeveloperLogout = () => {
     setIsDeveloperMode(false);
-    setCurrentView('home');
+    setCurrentView("home");
   };
 
   // 🔹 Atualizações da fila (painel dev)
   const handleQueueUpdate = async (newQueue: QueueItem[]) => {
     setQueue(newQueue);
     try {
-      const existingIds = new Set(queue.map(q => q.id?.toString()));
-      const newIds = new Set(newQueue.map(n => n.id?.toString()));
-      const toDelete = Array.from(existingIds).filter(id => !newIds.has(id));
+      const existingIds = new Set(queue.map((q) => q.id?.toString()));
+      const newIds = new Set(newQueue.map((n) => n.id?.toString()));
+      const toDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
       await Promise.all([
-        ...newQueue.map(item => saveQueueItem({ ...item, id: String(item.id) })),
-        ...toDelete.map(id => deleteQueueItem(id))
+        ...newQueue.map((item) =>
+          saveQueueItem({ ...item, id: String(item.id) })
+        ),
+        ...toDelete.map((id) => deleteQueueItem(id)),
       ]);
       console.log(`Fila salva com sucesso: ${newQueue.length} itens.`);
     } catch (err) {
-      console.error('Erro ao salvar fila:', err);
+      console.error("Erro ao salvar fila:", err);
     }
   };
 
-  const handleSettingsUpdate = async (newSettings: { isLocked: boolean; isShopOpen: boolean }) => {
+  const handleSettingsUpdate = async (newSettings: {
+    isLocked: boolean;
+    isShopOpen: boolean;
+  }) => {
     setIsQueueLocked(newSettings.isLocked);
     setIsShopOpen(newSettings.isShopOpen);
     await saveSettings(newSettings);
@@ -149,24 +151,34 @@ function App() {
 
   const handleClosedMessageUpdate = async (message: string) => {
     setClosedMessage(message);
-    await saveSettings({ isLocked: isQueueLocked, isShopOpen, closedMessage: message });
+    await saveSettings({
+      isLocked: isQueueLocked,
+      isShopOpen,
+      closedMessage: message,
+    });
   };
 
-  // 🔹 Layout
   if (loading || isLoadingData)
-    return <div className="min-h-screen flex items-center justify-center text-red-700 text-xl">Carregando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-700 text-xl">
+        Carregando...
+      </div>
+    );
 
   if (error || !config)
-    return <div className="min-h-screen flex items-center justify-center text-red-600 text-xl">Erro: {error}</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-600 text-xl">
+        Erro: {error}
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50">
       <div className="container mx-auto px-4 py-8">
         <Header config={config} />
-        
-        {currentView === 'home' && (
+        {currentView === "home" && (
           <>
-            <QueueList 
+            <QueueList
               queue={queue}
               onPositionSelect={handlePositionSelect}
               isLocked={isQueueLocked}
@@ -185,36 +197,43 @@ function App() {
           </>
         )}
 
-        {currentView === 'form' && (
+        {currentView === "form" && (
           <CustomerForm
             position={selectedPosition}
             services={config.services}
             barbershopPhone={config.barbershop.phone}
             onSubmit={handleFormSubmit}
-            onCancel={() => { setCurrentView('home'); setSelectedPosition(null); }}
+            onCancel={() => {
+              setCurrentView("home");
+              setSelectedPosition(null);
+            }}
           />
         )}
 
-        {currentView === 'developer' && isDeveloperMode && (
+        {currentView === "developer" && isDeveloperMode && (
           <DeveloperPanel
             queue={queue}
             setQueue={handleQueueUpdate}
             isLocked={isQueueLocked}
-            setIsLocked={(locked) => handleSettingsUpdate({ isLocked: locked, isShopOpen })}
+            setIsLocked={(locked) =>
+              handleSettingsUpdate({ isLocked: locked, isShopOpen })
+            }
             isShopOpen={isShopOpen}
-            setIsShopOpen={(open) => handleSettingsUpdate({ isLocked: isQueueLocked, isShopOpen: open })}
+            setIsShopOpen={(open) =>
+              handleSettingsUpdate({ isLocked: isQueueLocked, isShopOpen: open })
+            }
             closedMessage={closedMessage}
             setClosedMessage={handleClosedMessageUpdate}
-            onViewAppointments={() => setCurrentView('appointments')}
-            onBackToHome={() => setCurrentView('home')}
+            onViewAppointments={() => setCurrentView("appointments")}
+            onBackToHome={() => setCurrentView("home")}
             onLogout={handleDeveloperLogout}
           />
         )}
 
-        {currentView === 'appointments' && isDeveloperMode && (
+        {currentView === "appointments" && isDeveloperMode && (
           <OtherAppointments
             services={config.services}
-            onBack={() => setCurrentView('developer')}
+            onBack={() => setCurrentView("developer")}
           />
         )}
 
