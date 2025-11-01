@@ -61,7 +61,7 @@ export const loadQueue = async (): Promise<QueueItem[]> => {
   return items.sort((a, b) => parseInt(a.id) - parseInt(b.id));
 };
 
-// ✅ Transação atômica com fallback seguro
+// ✅ Transação atômica — evita sobrescrita e concorrência
 export const tryBookSlot = async (
   slotId: string,
   newData: QueueItem
@@ -69,10 +69,10 @@ export const tryBookSlot = async (
   const slotRef = doc(db, "barbershop", "queue", "items", slotId);
 
   try {
-    const result = await runTransaction(db, async (transaction) => {
+    const success = await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(slotRef);
 
-      // Se a vaga não existir, cria automaticamente
+      // Vaga não existe → cria
       if (!snapshot.exists()) {
         transaction.set(slotRef, {
           ...newData,
@@ -83,31 +83,32 @@ export const tryBookSlot = async (
         return true;
       }
 
-      const slot = snapshot.data() as QueueItem;
-      // Se já tiver nome, alguém reservou primeiro
-      if (slot.name && slot.name.trim() !== "") {
-        throw new Error("Vaga já ocupada.");
+      const current = snapshot.data() as QueueItem;
+      // Se já ocupada → impede sobrescrita
+      if (current.name && current.name.trim() !== "") {
+        throw new Error("Vaga ocupada");
       }
 
-      // Se livre, reservar
+      // Livre → grava
       transaction.set(slotRef, {
         ...newData,
         id: slotId,
         addedAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
+
       return true;
     });
 
-    console.log(`[✅ Reserva confirmada] Vaga ${slotId} gravada com sucesso.`);
-    return result;
+    console.log(`[OK] Vaga ${slotId} reservada com sucesso.`);
+    return success;
   } catch (err) {
-    console.warn(`[⚠️ CONFLITO] Vaga ${slotId} já foi ocupada.`);
+    console.warn(`[CONFLITO] Vaga ${slotId} já ocupada.`);
     return false;
   }
 };
 
-// ✅ Salvar um único item da fila
+// ✅ Salvar item individual (painel dev)
 export const saveQueueItem = async (item: QueueItem): Promise<void> => {
   const queueCollection = collection(db, "barbershop", "queue", "items");
   const id = item.id?.toString() || String(Date.now());
@@ -118,21 +119,19 @@ export const saveQueueItem = async (item: QueueItem): Promise<void> => {
     { ...item, id, updatedAt: Timestamp.now() },
     { merge: true }
   );
-
-  console.log(`[SYNC] Item ${id} salvo/atualizado.`);
 };
 
-// ✅ Excluir item da fila
+// ✅ Excluir item
 export const deleteQueueItem = async (id: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, "barbershop", "queue", "items", id));
-    console.log(`[DEL] Item ${id} removido.`);
+    console.log(`[DEL] Vaga ${id} removida.`);
   } catch (err) {
-    console.error(`[ERRO] Falha ao excluir item ${id}:`, err);
+    console.error("Erro ao excluir vaga:", err);
   }
 };
 
-// ✅ Assinatura em tempo real (onSnapshot)
+// ✅ Assinatura em tempo real
 export const subscribeToQueue = (callback: (items: QueueItem[]) => void) => {
   const queueCollection = collection(db, "barbershop", "queue", "items");
   return onSnapshot(queueCollection, (snapshot) => {
