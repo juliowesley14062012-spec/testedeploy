@@ -10,14 +10,16 @@
     }
   },
   "services": [
-    { "name": "Cortes simples", "price": 20 },
-    { "name": "Corte disfarçado", "price": 30 },
+    { "name": "Cortes simples (1 pente só)", "price": 20 },
+    { "name": "Corte disfarçado", "price": 35 },
     { "name": "Barba", "price": 10 },
+    { "name": "Corte disfarçado+Barba", "price": 45 },
     { "name": "Pezinho", "price": 10 },
-    { "name": "Pigmentação", "price": 10 },
-    { "name": "Pezinho e barba", "price": 15 },
-    { "name": "Nevou", "price": 50 },
-    { "name": "Reflexo", "price": 50 }
+    { "name": "Corte+Pigmentação", "price": 45 },
+    { "name": "Corte+Nevou (a partir de R$80)", "price": 80 },
+    { "name": "Corte+Reflexo (a partir de R$90)", "price": 90 },
+    { "name": "Nevou+Reflexo (do pente 1 ao 3)", "price": 45 },
+    { "name": "Nevou+Reflexo (do pente 4 em diante)", "price": 55 }
   ],
   "footer": {
     "message": "Esperamos vê-lo em breve!",
