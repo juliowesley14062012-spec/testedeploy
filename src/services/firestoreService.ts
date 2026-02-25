@@ -168,10 +168,11 @@ export const subscribeToSettings = (callback: (s: Settings) => void) => {
 };
 
 // ===============================
-// FUTURE APPOINTMENTS (ADICIONADO - NECESSÁRIO PARA O BUILD)
+// FUTURE APPOINTMENTS
 // ===============================
+
 export const loadAppointments = async (): Promise<Appointment[]> => {
-  const collectionRef = collection(db, "barbershop", "appointments");
+  const collectionRef = collection(db, "appointments");
   const snapshot = await getDocs(collectionRef);
 
   const items: Appointment[] = [];
@@ -183,7 +184,7 @@ export const loadAppointments = async (): Promise<Appointment[]> => {
 };
 
 export const saveAppointments = async (appointments: Appointment[]) => {
-  const collectionRef = collection(db, "barbershop", "appointments");
+  const collectionRef = collection(db, "appointments");
 
   for (const appointment of appointments) {
     const docRef = doc(collectionRef, appointment.id);
@@ -194,7 +195,7 @@ export const saveAppointments = async (appointments: Appointment[]) => {
 export const subscribeToAppointments = (
   callback: (items: Appointment[]) => void
 ) => {
-  const collectionRef = collection(db, "barbershop", "appointments");
+  const collectionRef = collection(db, "appointments");
 
   return onSnapshot(collectionRef, (snapshot) => {
     const items: Appointment[] = [];
