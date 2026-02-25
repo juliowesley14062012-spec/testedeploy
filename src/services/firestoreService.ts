@@ -39,12 +39,13 @@ export interface Appointment {
   id: string;
   clientName: string;
   clientPhone: string;
-  service: string;
+  service: any;
   date: string;
   time: string;
   status: "scheduled" | "confirmed" | "completed" | "cancelled";
-  createdAt: Timestamp;
+  createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  notes?: string;
 }
 
 // ===============================
@@ -61,7 +62,6 @@ export const loadQueue = async (): Promise<QueueItem[]> => {
   return items.sort((a, b) => parseInt(a.id) - parseInt(b.id));
 };
 
-// ✅ Transação atômica — evita sobrescrita e concorrência
 export const tryBookSlot = async (
   slotId: string,
   newData: QueueItem
@@ -72,7 +72,6 @@ export const tryBookSlot = async (
     const success = await runTransaction(db, async (transaction) => {
       const snapshot = await transaction.get(slotRef);
 
-      // Vaga não existe → cria
       if (!snapshot.exists()) {
         transaction.set(slotRef, {
           ...newData,
@@ -84,12 +83,11 @@ export const tryBookSlot = async (
       }
 
       const current = snapshot.data() as QueueItem;
-      // Se já ocupada → impede sobrescrita
+
       if (current.name && current.name.trim() !== "") {
         throw new Error("Vaga ocupada");
       }
 
-      // Livre → grava
       transaction.set(slotRef, {
         ...newData,
         id: slotId,
@@ -100,15 +98,12 @@ export const tryBookSlot = async (
       return true;
     });
 
-    console.log(`[OK] Vaga ${slotId} reservada com sucesso.`);
     return success;
-  } catch (err) {
-    console.warn(`[CONFLITO] Vaga ${slotId} já ocupada.`);
+  } catch {
     return false;
   }
 };
 
-// ✅ Salvar item individual (painel dev)
 export const saveQueueItem = async (item: QueueItem): Promise<void> => {
   const queueCollection = collection(db, "barbershop", "queue", "items");
   const id = item.id?.toString() || String(Date.now());
@@ -121,17 +116,10 @@ export const saveQueueItem = async (item: QueueItem): Promise<void> => {
   );
 };
 
-// ✅ Excluir item
 export const deleteQueueItem = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, "barbershop", "queue", "items", id));
-    console.log(`[DEL] Vaga ${id} removida.`);
-  } catch (err) {
-    console.error("Erro ao excluir vaga:", err);
-  }
+  await deleteDoc(doc(db, "barbershop", "queue", "items", id));
 };
 
-// ✅ Assinatura em tempo real
 export const subscribeToQueue = (callback: (items: QueueItem[]) => void) => {
   const queueCollection = collection(db, "barbershop", "queue", "items");
   return onSnapshot(queueCollection, (snapshot) => {
@@ -176,5 +164,43 @@ export const saveSettings = async (settings: Settings) => {
 export const subscribeToSettings = (callback: (s: Settings) => void) => {
   return onSnapshot(doc(db, "barbershop", "settings"), (snap) => {
     if (snap.exists()) callback(snap.data() as Settings);
+  });
+};
+
+// ===============================
+// FUTURE APPOINTMENTS (ADICIONADO - NECESSÁRIO PARA O BUILD)
+// ===============================
+export const loadAppointments = async (): Promise<Appointment[]> => {
+  const collectionRef = collection(db, "barbershop", "appointments");
+  const snapshot = await getDocs(collectionRef);
+
+  const items: Appointment[] = [];
+  snapshot.forEach((docSnap) => {
+    items.push({ ...(docSnap.data() as Appointment), id: docSnap.id });
+  });
+
+  return items;
+};
+
+export const saveAppointments = async (appointments: Appointment[]) => {
+  const collectionRef = collection(db, "barbershop", "appointments");
+
+  for (const appointment of appointments) {
+    const docRef = doc(collectionRef, appointment.id);
+    await setDoc(docRef, appointment, { merge: true });
+  }
+};
+
+export const subscribeToAppointments = (
+  callback: (items: Appointment[]) => void
+) => {
+  const collectionRef = collection(db, "barbershop", "appointments");
+
+  return onSnapshot(collectionRef, (snapshot) => {
+    const items: Appointment[] = [];
+    snapshot.forEach((docSnap) => {
+      items.push({ ...(docSnap.data() as Appointment), id: docSnap.id });
+    });
+    callback(items);
   });
 };
