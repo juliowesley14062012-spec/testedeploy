@@ -170,6 +170,7 @@ export const subscribeToSettings = (callback: (s: Settings) => void) => {
 // ===============================
 // FUTURE APPOINTMENTS
 // ===============================
+
 export const loadAppointments = async (): Promise<Appointment[]> => {
   const collectionRef = collection(db, "barbershop", "appointments", "items");
   const snapshot = await getDocs(collectionRef);
@@ -182,28 +183,33 @@ export const loadAppointments = async (): Promise<Appointment[]> => {
   return items;
 };
 
-export const saveAppointments = async (appointments: Appointment[]) => {
+export const saveAppointments = async (
+  appointments: Appointment[]
+): Promise<void> => {
   const collectionRef = collection(db, "barbershop", "appointments", "items");
 
   for (const appointment of appointments) {
     const docRef = doc(collectionRef, appointment.id);
     await setDoc(
       docRef,
-      { ...appointment, updatedAt: Timestamp.now() },
+      {
+        ...appointment,
+        updatedAt: Timestamp.now(),
+      },
       { merge: true }
     );
   }
 };
 
+export const deleteAppointment = async (id: string): Promise<void> => {
+  const docRef = doc(db, "barbershop", "appointments", "items", id);
+  await deleteDoc(docRef);
+};
+
 export const subscribeToAppointments = (
   callback: (items: Appointment[]) => void
 ) => {
-  const collectionRef = collection(
-    db,
-    "barbershop",
-    "appointments",
-    "items"
-  );
+  const collectionRef = collection(db, "barbershop", "appointments", "items");
 
   return onSnapshot(collectionRef, (snapshot) => {
     const items: Appointment[] = [];
