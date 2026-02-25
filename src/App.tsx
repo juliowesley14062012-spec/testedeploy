@@ -58,13 +58,16 @@ function App() {
   // 🔹 Sincronização em tempo real
   useEffect(() => {
     if (isLoadingData) return;
+
     const unsubQueue = subscribeToQueue((newQueue) => setQueue(newQueue));
+
     const unsubSettings = subscribeToSettings((newSettings) => {
       setIsQueueLocked(newSettings?.isLocked ?? false);
       setIsShopOpen(newSettings?.isShopOpen ?? true);
       if (newSettings?.closedMessage)
         setClosedMessage(newSettings.closedMessage);
     });
+
     return () => {
       unsubQueue();
       unsubSettings();
@@ -79,13 +82,13 @@ function App() {
     setCurrentView("form");
   };
 
-  // 🔹 Agendar vaga com proteção atômica
+  // 🔹 Agendar vaga com retorno boolean (CORRIGIDO)
   const handleFormSubmit = async (data: {
     name: string;
     phone: string;
     service: ServiceType;
-  }) => {
-    if (selectedPosition === null || !config) return;
+  }): Promise<boolean> => {
+    if (selectedPosition === null || !config) return false;
 
     const itemToSave: QueueItem = {
       id: String(selectedPosition),
@@ -101,14 +104,17 @@ function App() {
       alert("Essa vaga acabou de ser ocupada. Escolha outra disponível.");
       setCurrentView("home");
       setSelectedPosition(null);
-      return;
+      return false; // 🔴 ESSENCIAL
     }
 
     console.log(
       `✅ Novo agendamento confirmado: ${data.name} - vaga ${selectedPosition}`
     );
+
     setCurrentView("home");
     setSelectedPosition(null);
+
+    return true; // 🔴 ESSENCIAL
   };
 
   const handleDeveloperLogin = () => {
@@ -128,12 +134,14 @@ function App() {
       const existingIds = new Set(queue.map((q) => q.id?.toString()));
       const newIds = new Set(newQueue.map((n) => n.id?.toString()));
       const toDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
+
       await Promise.all([
         ...newQueue.map((item) =>
           saveQueueItem({ ...item, id: String(item.id) })
         ),
         ...toDelete.map((id) => deleteQueueItem(id)),
       ]);
+
       console.log(`Fila salva com sucesso: ${newQueue.length} itens.`);
     } catch (err) {
       console.error("Erro ao salvar fila:", err);
@@ -176,6 +184,7 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50">
       <div className="container mx-auto px-4 py-8">
         <Header config={config} />
+
         {currentView === "home" && (
           <>
             <QueueList
@@ -186,6 +195,7 @@ function App() {
               closedMessage={closedMessage}
               isDeveloperMode={isDeveloperMode}
             />
+
             <div className="mt-8 flex justify-center">
               <button
                 onClick={handleDeveloperLogin}
@@ -220,7 +230,10 @@ function App() {
             }
             isShopOpen={isShopOpen}
             setIsShopOpen={(open) =>
-              handleSettingsUpdate({ isLocked: isQueueLocked, isShopOpen: open })
+              handleSettingsUpdate({
+                isLocked: isQueueLocked,
+                isShopOpen: open,
+              })
             }
             closedMessage={closedMessage}
             setClosedMessage={handleClosedMessageUpdate}
