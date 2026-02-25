@@ -183,6 +183,26 @@ export const loadAppointments = async (): Promise<Appointment[]> => {
   return items;
 };
 
+// 🔥 NOVA FUNÇÃO — adicionar apenas 1 agendamento
+export const addAppointment = async (
+  appointment: Appointment
+): Promise<void> => {
+  const docRef = doc(
+    db,
+    "barbershop",
+    "appointments",
+    "items",
+    appointment.id
+  );
+
+  await setDoc(docRef, {
+    ...appointment,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+};
+
+// Mantida apenas para compatibilidade (não usar para excluir)
 export const saveAppointments = async (
   appointments: Appointment[]
 ): Promise<void> => {
