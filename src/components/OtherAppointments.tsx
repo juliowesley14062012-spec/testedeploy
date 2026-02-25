@@ -55,20 +55,35 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
   }, [isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const newAppointment: FutureAppointment = {
-      id: Date.now().toString(),
-      clientName: formData.clientName,
-      clientPhone: formData.clientPhone,
-      service: formData.service,
-      date: formData.date,
-      time: formData.time,
-      status: 'scheduled',
-      notes: formData.notes
-    };
+  const newAppointment: FutureAppointment = {
+    id: Date.now().toString(),
+    clientName: formData.clientName,
+    clientPhone: formData.clientPhone,
+    service: formData.service,
+    date: formData.date,
+    time: formData.time,
+    status: 'scheduled',
+    notes: formData.notes
+  };
 
+  try {
     await addAppointment(newAppointment);
+
+    const message = `Olá! Acabei de agendar meu corte na Brayan Barbearia:
+
+📍 Posição: Agendamento Futuro
+👤 Nome: ${formData.clientName}
+📱 WhatsApp: ${formData.clientPhone}
+✂️ Serviço: ${formData.service.name}
+📅 Data: ${formData.date}
+⏰ Horário: ${formData.time}`;
+
+    const whatsappUrl = `https://wa.me/5521982821521?text=${encodeURIComponent(message)}`;
+
+    // 🔥 Redireciona sem bloqueio de pop-up
+    window.location.href = whatsappUrl;
 
     setFormData({
       date: '',
@@ -80,8 +95,12 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
     });
 
     setShowForm(false);
-  };
 
+  } catch (error) {
+    console.error("Erro ao salvar agendamento:", error);
+  }
+};
+  
   const deleteAppointment = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este agendamento?')) {
       await deleteAppointmentFromFirestore(id);
