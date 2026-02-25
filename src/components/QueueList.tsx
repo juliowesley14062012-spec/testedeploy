@@ -111,7 +111,7 @@ const QueueList: React.FC<QueueListProps> = ({
       </div>
 
       <div className="mt-6 text-center">
-        <div className="inline-flex items-center space-x-6 bg-white/90 backdrop-blur-sm rounded-full px-6 py-3 border border-gray-200 shadow-md">
+        <div className="inline-flex items-center space-x-1 bg-white/90 backdrop-blur-sm rounded-full px-6 py-3 border border-gray-200 shadow-md">
           <div className="flex items-center">
             <div className="w-3 h-3 bg-red-500 rounded-full mr-2 animate-pulse"></div>
             <span className="text-sm text-gray-700">Cortando</span>
