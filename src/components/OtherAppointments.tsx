@@ -118,7 +118,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Agendamento
