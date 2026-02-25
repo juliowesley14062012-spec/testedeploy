@@ -13,7 +13,7 @@ interface OtherAppointmentsProps {
   onBack: () => void;
 }
 
-const OtherAppointments: React.FC<OtherAppointmentsProps>> = ({ services, onBack }) => {
+const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack }) => {
   const [appointments, setAppointments] = useState<FutureAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
