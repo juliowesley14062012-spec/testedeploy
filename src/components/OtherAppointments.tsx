@@ -16,8 +16,8 @@ interface OtherAppointmentsProps {
 const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack }) => {
   const [appointments, setAppointments] = useState<FutureAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
   const [showForm, setShowForm] = useState(false);
+
   const [formData, setFormData] = useState({
     date: '',
     time: '',
@@ -88,14 +88,6 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
     }
   };
 
-  const formatPhone = (value: string) => {
-    const digits = value.replace(/\D/g, '');
-    if (digits.length <= 11) {
-      return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-    }
-    return value;
-  };
-
   const sortedAppointments = [...appointments].sort((a, b) => {
     const dateA = new Date(`${a.date}T${a.time}`);
     const dateB = new Date(`${b.date}T${b.time}`);
@@ -116,6 +108,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
     <div className="max-w-4xl mx-auto">
       <div className="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-200 p-8 shadow-lg">
 
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-bold text-gray-800 flex items-center">
             <Calendar className="w-8 h-8 mr-3 text-red-600" />
@@ -141,6 +134,94 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
           </div>
         </div>
 
+        {/* FORMULÁRIO */}
+        {showForm && (
+          <form
+            onSubmit={handleSubmit}
+            className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6 space-y-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <input
+                type="date"
+                required
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="border p-2 rounded"
+              />
+
+              <input
+                type="time"
+                required
+                value={formData.time}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                className="border p-2 rounded"
+              />
+
+              <input
+                type="text"
+                placeholder="Nome do Cliente"
+                required
+                value={formData.clientName}
+                onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                className="border p-2 rounded"
+              />
+
+              <input
+                type="text"
+                placeholder="Telefone"
+                required
+                value={formData.clientPhone}
+                onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
+                className="border p-2 rounded"
+              />
+
+              <select
+                value={formData.service?.name}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    service: services.find(s => s.name === e.target.value) || services[0]
+                  })
+                }
+                className="border p-2 rounded"
+              >
+                {services.map((service) => (
+                  <option key={service.name} value={service.name}>
+                    {service.name} - R$ {service.price}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Observações"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="border p-2 rounded"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+              >
+                Salvar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* LISTA */}
         <div className="space-y-4">
           {sortedAppointments.length === 0 ? (
             <div className="text-center py-12">
@@ -159,6 +240,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                 className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm"
               >
                 <div className="flex items-start justify-between">
+
                   <div className="flex-1">
 
                     <div className="flex items-center gap-4 mb-3">
