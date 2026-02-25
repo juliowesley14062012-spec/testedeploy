@@ -3,9 +3,9 @@ import { Calendar, Plus, Trash2, ArrowLeft, Clock, User, Phone } from 'lucide-re
 import { FutureAppointment, ServiceType } from '../types';
 import { 
   loadAppointments, 
-  saveAppointments, 
   subscribeToAppointments,
-  deleteAppointment as deleteAppointmentFromFirestore
+  deleteAppointment as deleteAppointmentFromFirestore,
+  addAppointment
 } from '../services/firestoreService';
 
 interface OtherAppointmentsProps {
@@ -13,7 +13,7 @@ interface OtherAppointmentsProps {
   onBack: () => void;
 }
 
-const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack }) => {
+const OtherAppointments: React.FC<OtherAppointmentsProps>> = ({ services, onBack }) => {
   const [appointments, setAppointments] = useState<FutureAppointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -27,7 +27,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
     notes: ''
   });
 
-  // Load initial data
+  // Load inicial
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -43,7 +43,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
     loadData();
   }, []);
 
-  // Real-time subscription
+  // Realtime
   useEffect(() => {
     if (isLoading) return;
 
@@ -68,9 +68,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
       notes: formData.notes
     };
 
-    const updatedAppointments = [...appointments, newAppointment];
-
-    await saveAppointments(updatedAppointments);
+    await addAppointment(newAppointment);
 
     setFormData({
       date: '',
@@ -84,7 +82,6 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
     setShowForm(false);
   };
 
-  // ✅ CORRIGIDO AQUI
   const deleteAppointment = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este agendamento?')) {
       await deleteAppointmentFromFirestore(id);
@@ -118,12 +115,13 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-200 p-8 shadow-lg">
+
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-bold text-gray-800 flex items-center">
             <Calendar className="w-8 h-8 mr-3 text-red-600" />
             Outros Agendamentos
           </h2>
-          
+
           <div className="flex gap-3">
             <button
               onClick={() => setShowForm(true)}
@@ -132,7 +130,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
               <Plus className="w-4 h-4 mr-2" />
               Novo Agendamento
             </button>
-            
+
             <button
               onClick={onBack}
               className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -162,6 +160,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
+
                     <div className="flex items-center gap-4 mb-3">
                       <div className="flex items-center text-red-600">
                         <Calendar className="w-5 h-5 mr-2" />
@@ -169,7 +168,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                           {formatDate(appointment.date)}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center text-blue-600">
                         <Clock className="w-5 h-5 mr-2" />
                         <span className="font-medium">
@@ -188,7 +187,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                         <Phone className="w-4 h-4 mr-2 text-gray-600" />
                         <span>{appointment.clientPhone}</span>
                       </div>
-                      
+
                       <div className="text-blue-600 font-medium">
                         {appointment.service.name} - R$ {appointment.service.price}
                       </div>
@@ -199,6 +198,7 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                         <strong>Obs:</strong> {appointment.notes}
                       </div>
                     )}
+
                   </div>
 
                   <button
@@ -208,11 +208,13 @@ const OtherAppointments: React.FC<OtherAppointmentsProps> = ({ services, onBack 
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+
                 </div>
               </div>
             ))
           )}
         </div>
+
       </div>
     </div>
   );
