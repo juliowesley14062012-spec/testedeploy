@@ -23,24 +23,36 @@ const CustomerForm: React.FC<CustomerFormProps> = ({
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !phone || !selectedService) return;
+  e.preventDefault();
+  if (!name || !phone || !selectedService) return;
 
-    setSubmitting(true);
-    const success = await onSubmit({ name, phone, service: selectedService });
-    setSubmitting(false);
+  setSubmitting(true);
 
-    if (!success) {
-      alert('Essa vaga acabou de ser ocupada. Escolha outra.');
-    } else {
-      const serviceInfo = `${selectedService.name} - R$${selectedService.price}`;
-      const message = `Olá! Acabei de agendar meu corte na Brayan Barbearia:\n\n📍 Posição: ${position}º\n👤 Nome: ${name}\n📱 WhatsApp: ${phone}\n✂️ Serviço: ${serviceInfo}`;
-      setTimeout(() => {
-        const url = `https://wa.me/${barbershopPhone}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-      }, 500);
-    }
-  };
+  const success = await onSubmit({ name, phone, service: selectedService });
+
+  setSubmitting(false);
+
+  if (!success) {
+    alert('Essa vaga acabou de ser ocupada. Escolha outra.');
+    return;
+  }
+
+  const serviceInfo = `${selectedService.name} - R$${selectedService.price}`;
+
+  const message = `Olá! Acabei de agendar meu corte na Brayan Barbearia:
+
+📍 Posição: ${position}º
+👤 Nome: ${name}
+📱 WhatsApp: ${phone}
+✂️ Serviço: ${serviceInfo}`;
+
+  const cleanPhone = barbershopPhone.replace(/\D/g, '');
+
+  const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+
+  // ✅ iPhone safe
+  window.location.assign(url);
+};
 
   return (
     <div className="max-w-4xl mx-auto">
